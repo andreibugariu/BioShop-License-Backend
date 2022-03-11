@@ -70,7 +70,13 @@ func main() {
 	router.HandleFunc("/user/{id}", GetUser).Methods("GET")//merge
 	router.HandleFunc("/user", CreateUser).Methods("POST")//merge
 	router.HandleFunc("/user/{id}", DeleteUser).Methods("DELETE")//merge
-	router.HandleFunc("/user/{id}", UpdateUser).Methods("PUT")
+	router.HandleFunc("/user/{id}", UpdateUser).Methods("PUT")//merge
+
+	router.HandleFunc("/farmers", GetFarmers).Methods("GET")//merge
+	router.HandleFunc("/farmer/{id}", GetFarmer).Methods("GET")//merge
+	router.HandleFunc("/farmer", CreateFarmer).Methods("POST")//merge
+	router.HandleFunc("/farmer/{id}", DeleteFarmer).Methods("DELETE")//merge
+	router.HandleFunc("/farmer/{id}", UpdateFarmer).Methods("PUT")//merge
 
 
 	log.Fatal(http.ListenAndServe(":8080", router))
@@ -168,3 +174,93 @@ func UpdateUser(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode("Userul is succefully UPTDATE")
 }
 
+//Create a new farmer
+func CreateFarmer(w http.ResponseWriter, r *http.Request) {
+
+	var farmer entity.Farmer
+
+	json.NewDecoder(r.Body).Decode(&farmer)
+
+	createFarmer := db.Create(&farmer)
+	err = createFarmer.Error
+	if err != nil {
+		json.NewEncoder(w).Encode(err)
+	} else {
+		json.NewEncoder(w).Encode(&farmer)
+	}
+}
+
+
+//Get all  farmers
+func GetFarmers(w http.ResponseWriter, r *http.Request) {
+
+
+	var farmer []entity.Farmer
+	result := db.Find(&farmer)
+	if result.RecordNotFound() {
+		http.Error(w, "Not fount", http.StatusNotFound)
+		return
+	}
+
+	json.NewEncoder(w).Encode(&farmer)
+
+}
+
+
+//Get specific farmer and their products
+func GetFarmer(w http.ResponseWriter, r *http.Request) {
+	//Check the credentials provided in the request. Also check for errors at authentication.
+
+	params := mux.Vars(r)
+
+	var farmer entity.Farmer
+	var products []entity.Product
+	result := db.Where("id = ?", params["id"]).First(&farmer)
+	if result.RecordNotFound() {
+		http.Error(w, "Not fount", http.StatusNotFound)
+		return
+	}
+
+	db.Model(&farmer).Related(&products)
+
+	farmer.Products = products
+
+	json.NewEncoder(w).Encode(farmer)
+}
+
+//Delete a specific user by ID
+func DeleteFarmer(w http.ResponseWriter, r *http.Request) {
+
+	params := mux.Vars(r)
+
+	var farmer entity.Farmer
+
+	result := db.Where("id = ?", params["id"]).First(&farmer)
+	if result.RecordNotFound() {
+		http.Error(w, "Not fount", http.StatusNotFound)
+		return
+	}
+
+	result = db.Delete(&farmer)
+	if result.Error != nil {
+		http.Error(w, "can't delete farmer", http.StatusNotFound)
+		return
+	}
+
+	json.NewEncoder(w).Encode("Farmer is succefully deleting")
+}
+
+//Update a specific user by ID
+func UpdateFarmer(w http.ResponseWriter, r *http.Request) {
+	
+	var farmer entity.Farmer
+	params := mux.Vars(r)
+	json.NewDecoder(r.Body).Decode(&farmer)
+
+	result := db.Model(&entity.Farmer{}).Where("id= ?", params["id"]).Updates(farmer)
+	if result.Error != nil {
+		http.Error(w, "Can't update", http.StatusInternalServerError)
+		return
+	}
+	json.NewEncoder(w).Encode("The Farmer is succefully UPTDATE")
+}
