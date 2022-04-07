@@ -51,7 +51,7 @@ func main() {
 	defer db.Close()
 	db.AutoMigrate(&entity.User{})
 	db.AutoMigrate(&entity.Farmer{})
-	db.AutoMigrate(&entity.Order_Product{})
+	db.AutoMigrate(&entity.Orders_Products{})
 	db.AutoMigrate(&entity.Product{})
 	db.AutoMigrate(&entity.Order{})
 
@@ -79,10 +79,28 @@ func main() {
 	router.HandleFunc("/farmer/{id}", UpdateFarmer).Methods("PUT")//merge
 
 
+	router.HandleFunc("/products", GetProducts).Methods("GET")//merge
+	router.HandleFunc("/product/{id}", GetProduct).Methods("GET")//merge
+	router.HandleFunc("/product", CreateProduct).Methods("POST")//merge
+	router.HandleFunc("/product/{id}", DeleteProduct).Methods("DELETE")//merge
+	router.HandleFunc("/product/{id}", UpdateProduct).Methods("PUT")//merge
+
+	router.HandleFunc("/orders", GetOrders).Methods("GET")//merge
+	router.HandleFunc("/order/{id}", GetOrder).Methods("GET")//merge
+	router.HandleFunc("/order", CreateOrder).Methods("POST")//merge
+	router.HandleFunc("/order/{id}", DeleteOrder).Methods("DELETE")//merge
+	router.HandleFunc("/order/{id}", UpdateOrder).Methods("PUT")//merge
+
+	router.HandleFunc("/orders_products", GetOrdersProducts).Methods("GET")//merge
+	router.HandleFunc("/order_product/{id}", GetOrderProduct).Methods("GET")//merge
+	router.HandleFunc("/order_product", CreateOrderProduct).Methods("POST")//merge
+	router.HandleFunc("/order_product/{id}", DeleteOrderProduct).Methods("DELETE")//merge
+	router.HandleFunc("/order_product/{id}", UpdateOrderProduct).Methods("PUT")//merge
+
 	log.Fatal(http.ListenAndServe(":8080", router))
 }
 
-
+/////////////// API for USER
 //Create a new user
 func CreateUser(w http.ResponseWriter, r *http.Request) {
 
@@ -174,6 +192,7 @@ func UpdateUser(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode("Userul is succefully UPTDATE")
 }
 
+/////////////// API for FARMERS
 //Create a new farmer
 func CreateFarmer(w http.ResponseWriter, r *http.Request) {
 
@@ -263,4 +282,272 @@ func UpdateFarmer(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	json.NewEncoder(w).Encode("The Farmer is succefully UPTDATE")
+}
+
+
+/////////////// API for PRODUCT
+
+func CreateProduct(w http.ResponseWriter, r *http.Request) {
+
+	var product entity.Product
+
+	json.NewDecoder(r.Body).Decode(&product)
+
+	createProduct := db.Create(&product)
+	err = createProduct.Error
+	if err != nil {
+		json.NewEncoder(w).Encode(err)
+	} else {
+		json.NewEncoder(w).Encode(&product)
+	}
+}
+
+func GetProducts(w http.ResponseWriter, r *http.Request) {
+
+
+	var product []entity.Product
+	result := db.Find(&product)
+	if result.RecordNotFound() {
+		http.Error(w, "Not fount", http.StatusNotFound)
+		return
+	}
+
+	json.NewEncoder(w).Encode(&product)
+
+}
+
+
+
+func GetProduct(w http.ResponseWriter, r *http.Request) {
+	//Check the credentials provided in the request. Also check for errors at authentication.
+
+	params := mux.Vars(r)
+
+	var product entity.Product
+	var orders_products []entity.Orders_Products
+	result := db.Where("id = ?", params["id"]).First(&product)
+	if result.RecordNotFound() {
+		http.Error(w, "Not fount", http.StatusNotFound)
+		return
+	}
+
+	db.Model(&product).Related(&orders_products)
+
+	product.Orders_Products = orders_products
+
+	json.NewEncoder(w).Encode(product)
+}
+
+
+func DeleteProduct(w http.ResponseWriter, r *http.Request) {
+
+	params := mux.Vars(r)
+
+	var product entity.Product
+
+	result := db.Where("id = ?", params["id"]).First(&product)
+	if result.RecordNotFound() {
+		http.Error(w, "Not fount", http.StatusNotFound)
+		return
+	}
+
+	result = db.Delete(&product)
+	if result.Error != nil {
+		http.Error(w, "can't delete product", http.StatusNotFound)
+		return
+	}
+
+	json.NewEncoder(w).Encode("Product is succefully deleting")
+}
+
+func UpdateProduct(w http.ResponseWriter, r *http.Request) {
+	
+	var product entity.Product
+	params := mux.Vars(r)
+	json.NewDecoder(r.Body).Decode(&product)
+
+	result := db.Model(&entity.Product{}).Where("id= ?", params["id"]).Updates(product)
+	if result.Error != nil {
+		http.Error(w, "Can't update", http.StatusInternalServerError)
+		return
+	}
+	json.NewEncoder(w).Encode("Product is succefully UPTDATE")
+}
+
+
+/////////////// API for ORDERS
+func CreateOrder(w http.ResponseWriter, r *http.Request) {
+
+	var order entity.Order
+
+	json.NewDecoder(r.Body).Decode(&order)
+
+	createOrder := db.Create(&order)
+	err = createOrder.Error
+	if err != nil {
+		json.NewEncoder(w).Encode(err)
+	} else {
+		json.NewEncoder(w).Encode(&order)
+	}
+}
+
+
+//Get all  order
+func GetOrders(w http.ResponseWriter, r *http.Request) {
+
+
+	var order []entity.Order
+	result := db.Find(&order)
+	if result.RecordNotFound() {
+		http.Error(w, "Not fount", http.StatusNotFound)
+		return
+	}
+
+	json.NewEncoder(w).Encode(&order)
+	
+
+}
+
+
+//Get specific order
+func GetOrder(w http.ResponseWriter, r *http.Request) {
+	//Check the credentials provided in the request. Also check for errors at authentication.
+    //Get order and the product
+	params := mux.Vars(r)
+
+	var order entity.Order
+	var orders_products []entity.Orders_Products
+	result := db.Where("id = ?", params["id"]).First(&order)
+	if result.RecordNotFound() {
+		http.Error(w, "Not fount", http.StatusNotFound)
+		return
+	}
+
+	db.Model(&order).Related(&orders_products)
+
+	order.Orders_Products = orders_products
+	json.NewEncoder(w).Encode(order)
+}
+
+//Delete a specific order by ID
+func DeleteOrder(w http.ResponseWriter, r *http.Request) {
+
+	params := mux.Vars(r)
+
+	var order entity.Order
+
+	result := db.Where("id = ?", params["id"]).First(&order)
+	if result.RecordNotFound() {
+		http.Error(w, "Not fount", http.StatusNotFound)
+		return
+	}
+
+	result = db.Delete(&order)
+	if result.Error != nil {
+		http.Error(w, "can't delete order", http.StatusNotFound)
+		return
+	}
+
+	json.NewEncoder(w).Encode("The order is succefully deleting")
+}
+
+//Update a specific order by ID
+func UpdateOrder(w http.ResponseWriter, r *http.Request) {
+	
+	var order entity.Order
+	params := mux.Vars(r)
+	json.NewDecoder(r.Body).Decode(&order)
+
+	result := db.Model(&entity.Order{}).Where("id= ?", params["id"]).Updates(order)
+	if result.Error != nil {
+		http.Error(w, "Can't update", http.StatusInternalServerError)
+		return
+	}
+	json.NewEncoder(w).Encode("Order is succefully UPTDATE")
+}
+
+/////////////// API for ORDERS_PRODUCT
+func CreateOrderProduct(w http.ResponseWriter, r *http.Request) {
+
+	var order_product entity.Orders_Products
+
+	json.NewDecoder(r.Body).Decode(&order_product)
+
+	createOrderProduct := db.Create(&order_product)
+	err = createOrderProduct.Error
+	if err != nil {
+		json.NewEncoder(w).Encode(err)
+	} else {
+		json.NewEncoder(w).Encode(&order_product)
+	}
+}
+
+
+//Get all  products
+func GetOrdersProducts(w http.ResponseWriter, r *http.Request) {
+
+
+	var order_product []entity.Orders_Products
+	result := db.Find(&order_product)
+	if result.RecordNotFound() {
+		http.Error(w, "Not fount", http.StatusNotFound)
+		return
+	}
+
+	json.NewEncoder(w).Encode(&order_product)
+
+}
+
+
+//Get specific user and their rentals
+func GetOrderProduct(w http.ResponseWriter, r *http.Request) {
+	//Check the credentials provided in the request. Also check for errors at authentication.
+
+	params := mux.Vars(r)
+
+	var order_product entity.Orders_Products
+	result := db.Where("id = ?", params["id"]).First(&order_product)
+	if result.RecordNotFound() {
+		http.Error(w, "Not fount", http.StatusNotFound)
+		return
+	}
+     
+	json.NewEncoder(w).Encode(order_product)
+}
+
+//Delete a specific product by ID
+func DeleteOrderProduct(w http.ResponseWriter, r *http.Request) {
+
+	params := mux.Vars(r)
+
+	var order_product entity.Orders_Products
+
+	result := db.Where("id = ?", params["id"]).First(&order_product)
+	if result.RecordNotFound() {
+		http.Error(w, "Not fount", http.StatusNotFound)
+		return
+	}
+
+	result = db.Delete(&order_product)
+	if result.Error != nil {
+		http.Error(w, "can't delete order", http.StatusNotFound)
+		return
+	}
+
+	json.NewEncoder(w).Encode("The order_product is succefully deleting")
+}
+
+//Update a specific product by ID
+func UpdateOrderProduct(w http.ResponseWriter, r *http.Request) {
+	
+	var order_product entity.Orders_Products
+	params := mux.Vars(r)
+	json.NewDecoder(r.Body).Decode(&order_product)
+
+	result := db.Model(&entity.Orders_Products{}).Where("id= ?", params["id"]).Updates(order_product)
+	if result.Error != nil {
+		http.Error(w, "Can't update", http.StatusInternalServerError)
+		return
+	}
+	json.NewEncoder(w).Encode("succefully UPTDATE")
 }

@@ -4,9 +4,10 @@ package entity
 type Product struct {
 
 		ID  string   `gorm:"type:uuid;default:uuid_generate_v4();primary_key;column:id"`
-		Name  string   `gorm:"type:varchar(255);not null"`
+		ProductName  string   `gorm:"type:varchar(255);not null"`
 		Description  string   `gorm:"type:varchar(255);not null"`
-		Price        string   `gorm:"type:varchar(255);not null"`
-		Orders_Products   []Order_Product  
+		Price        float64 `gorm:"type:float;not null"`
+		FarmerID string `gorm:"type:uuid;column:farmer_id;not null" validate:"required"`
+		Orders_Products   []Orders_Products 
 
 }
