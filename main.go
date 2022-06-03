@@ -101,10 +101,12 @@ func main() {
 	router.HandleFunc("/order_product", CreateOrderProduct).Methods("POST")//merge
 	router.HandleFunc("/order_product/{id}", DeleteOrderProduct).Methods("DELETE")//merge
 	router.HandleFunc("/order_product/{id}", UpdateOrderProduct).Methods("PUT")//merge
-
+   //.Methods(http.MethodPost,http.MethodOptions)
 	router.HandleFunc("/login", Login)//merge
 	//router.HandleFunc("/home", Home).Methods("GET")
 	router.HandleFunc("/logout", DeleteCookie)//merge
+	router.HandleFunc("/welcome", Welcome)
+
 
 	log.Fatal(http.ListenAndServe(":8080", router))
 }
@@ -134,6 +136,8 @@ type Claims struct {
 }
 
 func Login(w http.ResponseWriter, r *http.Request) {
+	// r.Header.Set("Access-Control-Allow-Origin","http://localhost:3000")
+	// r.Header.Set("Access-Control-Allow-Headers","authentication, content-type")
 	reqbody := r.Body
 	bodyBytes, err := ioutil.ReadAll(reqbody)
 
@@ -226,6 +230,50 @@ func IsAuth(w http.ResponseWriter, r *http.Request)  (bool, error) {
 	return true, nil
 }
 
+func Welcome(w http.ResponseWriter, r *http.Request) {
+	// We can obtain the session token from the requests cookies, which come with every request
+	c, err := r.Cookie("token")
+	if err != nil {
+		if err == http.ErrNoCookie {
+			// If the cookie is not set, return an unauthorized status
+			w.WriteHeader(http.StatusUnauthorized)
+			return
+		}
+		// For any other type of error, return a bad request status
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	// Get the JWT string from the cookie
+	tknStr := c.Value
+
+	// Initialize a new instance of `Claims`
+	claims := &Claims{}
+
+	// Parse the JWT string and store the result in `claims`.
+	// Note that we are passing the key in this method as well. This method will return an error
+	// if the token is invalid (if it has expired according to the expiry time we set on sign in),
+	// or if the signature does not match
+	tkn, err := jwt.ParseWithClaims(tknStr, claims, func(token *jwt.Token) (interface{}, error) {
+		return jwtKey, nil
+	})
+	if err != nil {
+		if err == jwt.ErrSignatureInvalid {
+			w.WriteHeader(http.StatusUnauthorized)
+			return
+		}
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+	if !tkn.Valid {
+		w.WriteHeader(http.StatusUnauthorized)
+		return
+	}
+
+	// Finally, return the welcome message to the user, along with their
+	// username given in the token
+	w.Write([]byte(fmt.Sprintf("Welcome %s!", claims.Email)))
+}
 
 func DeleteCookie(w http.ResponseWriter, r *http.Request) {
 	c := http.Cookie{
@@ -257,12 +305,12 @@ func CreateUser(w http.ResponseWriter, r *http.Request) {
 //Get all  users
 func GetUsers(w http.ResponseWriter, r *http.Request) {
     
-	isAuth, err := IsAuth(w, r)
-	if HasError(err,"Error in authentication function") {
-		http.Error(w,"Internal Error. Please try again later", http.StatusInternalServerError)
-		return
-	}
-	if isAuth {
+	// isAuth, err := IsAuth(w, r)
+	// if HasError(err,"Error in authentication function") {
+	// 	http.Error(w,"Internal Error. Please try again later", http.StatusInternalServerError)
+	// 	return
+	// }
+	// if isAuth {
 	var user []entity.User
 	result := db.Find(&user)
 	if result.RecordNotFound() {
@@ -271,7 +319,7 @@ func GetUsers(w http.ResponseWriter, r *http.Request) {
 	}
 
 	json.NewEncoder(w).Encode(&user)
-    }
+    //}
 
 }
 
