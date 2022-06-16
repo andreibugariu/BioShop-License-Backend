@@ -7,6 +7,6 @@ type Product struct {
 	Price          float64 `gorm:"type:float;not null"`
 	Photo          string  `gorm:"type:text;not null"`
 	Category       string  `gorm:"type:varchar(255);not null"`
-	FarmerID       string  `gorm:"type:uuid;column:farmer_id;not null" validate:"required"`
+	FarmerEmail       string  `gorm:"type:varchar(255);column:farmer_email;not null" validate:"required"`
 	Users_Products []Users_Products
 }

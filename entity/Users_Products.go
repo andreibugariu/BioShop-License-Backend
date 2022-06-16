@@ -7,4 +7,5 @@ type Users_Products struct {
 	ProductName string  `gorm:"type:varchar(255);not null"`
 	ProductPrice  float64 `gorm:"type:float;not null"`
 	Quantity  float64 `gorm:"type:float;not null"`
+    Status string  `gorm:"type:varchar(255);not null"`
 }

@@ -68,6 +68,10 @@ func main() {
 	router.HandleFunc("/farmer/{id}", DeleteFarmer).Methods("DELETE") //merge
 	router.HandleFunc("/farmer/{id}", UpdateFarmer).Methods("PUT")    //merge
 
+	router.HandleFunc("/farmer_products/{id}",GetFarmerProducts).Methods("GET") 
+
+	router.HandleFunc("/farmer_orders/{id}",GetFarmerOrders).Methods("GET") 
+
 	router.HandleFunc("/products", GetProducts).Methods("GET")                          //merge
 	router.HandleFunc("/product/{id}", GetProduct).Methods("GET")                       //merge
 	router.HandleFunc("/product", CreateProduct).Methods("POST")                        //merge
@@ -76,14 +80,20 @@ func main() {
 	router.HandleFunc("/product_by_category/{id}", GetProductByCategory).Methods("GET") //merge
 	router.HandleFunc("/search_name/{id}", GetSearchProducts).Methods("GET")
 
-	router.HandleFunc("/users_products", GetOrdersProducts).Methods("GET")        //merge
-	router.HandleFunc("/orders/{id}", GetOrderProduct).Methods("GET")             //merge
-	router.HandleFunc("/user_product/{id}", GetCart).Methods("GET")               //merge
-	router.HandleFunc("/user_product", CreateOrderProduct).Methods("POST")        //merge
+	router.HandleFunc("/users_products", GetOrdersProducts).Methods("GET")               //merge
+	router.HandleFunc("/orders/{id}", GetOrderProduct).Methods("GET")                    //merge
+	router.HandleFunc("/user_product/{id}", GetCart).Methods("GET")                      //merge
+	router.HandleFunc("/user_product", CreateOrderProduct).Methods("POST")               //merge
 	router.HandleFunc("/delete_user_product/{id}", DeleteOrderProduct).Methods("DELETE") //merge
-	router.HandleFunc("/increment/{id}", IncrementOrderProduct).Methods("PUT")    //merge
+	router.HandleFunc("/increment/{id}", IncrementOrderProduct).Methods("PUT")           //merge
 	router.HandleFunc("/decrement/{id}", DecrementOrderProduct).Methods("PUT")
+	router.HandleFunc("/checkout/{id}", OrderCheckout).Methods("PUT")
+
+	////////////////////////////////////////////////
+	
+
 	router.HandleFunc("/login", Login)         //merge
+	router.HandleFunc("/login_farmer", LoginFarmer)         //merge
 	router.HandleFunc("/logout", DeleteCookie) //merge
 	router.HandleFunc("/get_user", GetEmailCookie)
 
@@ -148,6 +158,62 @@ func Login(w http.ResponseWriter, r *http.Request) {
 
 	claims := &Claims{
 		Email: user.Email,
+		StandardClaims: jwt.StandardClaims{
+			ExpiresAt: expirationTime.Unix(),
+		},
+	}
+
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	tokenString, err := token.SignedString(jwtKey)
+
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	http.SetCookie(w,
+		&http.Cookie{
+			Name:    "token",
+			Value:   tokenString,
+			Expires: expirationTime,
+		})
+
+}
+
+func LoginFarmer(w http.ResponseWriter, r *http.Request) {
+	reqbody := r.Body
+	bodyBytes, err := ioutil.ReadAll(reqbody)
+
+	if HasError(err, "Internal Error. Unable to read data") {
+		http.Error(w, "Internal Error. Please try again later", http.StatusInternalServerError)
+		return
+	}
+
+	var farmer entity.Farmer
+	err = json.Unmarshal(bodyBytes, &farmer)
+
+	if HasError(err, "Internal Error. Unmarshal problem") {
+		http.Error(w, "Internal Error. Please try again later", http.StatusInternalServerError)
+		return
+	}
+
+	var userDB entity.Farmer
+	result := db.Find(&userDB, "email=?", farmer.Email)
+
+	if result.RecordNotFound() {
+		http.Error(w, "Email does not exist", http.StatusUnauthorized)
+		return
+	}
+
+	if farmer.Password != userDB.Password {
+		http.Error(w, "Incorrect password", http.StatusUnauthorized)
+		return
+	}
+
+	expirationTime := time.Now().Add(time.Minute * 100)
+
+	claims := &Claims{
+		Email: farmer.Email,
 		StandardClaims: jwt.StandardClaims{
 			ExpiresAt: expirationTime.Unix(),
 		},
@@ -698,7 +764,7 @@ func CreateOrderProduct(w http.ResponseWriter, r *http.Request) {
 		var user_product entity.Users_Products
 
 		json.NewDecoder(r.Body).Decode(&user_product)
-
+		user_product.Status = "active"
 		createUserProduct := db.Create(&user_product)
 		err = createUserProduct.Error
 		if err != nil {
@@ -741,7 +807,7 @@ func GetOrderProduct(w http.ResponseWriter, r *http.Request) {
 		params := mux.Vars(r)
 
 		var orders []entity.Users_Products
-		result := db.Where("user_email = ?", params["id"]).Find(&orders)
+		result := db.Where("user_email = ? AND status = ?", params["id"],"active").Find(&orders)
 		if result.RecordNotFound() {
 			http.Error(w, "Not fount", http.StatusNotFound)
 			return
@@ -750,6 +816,75 @@ func GetOrderProduct(w http.ResponseWriter, r *http.Request) {
 		json.NewEncoder(w).Encode(orders)
 	}
 }
+
+/////////////////////////////////////////GET PRODUCT BY EMAIL OF FARMER 
+func GetFarmerProducts(w http.ResponseWriter, r *http.Request){
+	//Check the credentials provided in the request. Also check for errors at authentication.
+	isAuth, err := IsAuth(w, r)
+	if HasError(err, "Error in authentication function") {
+		http.Error(w, "Internal Error. Please try again later", http.StatusInternalServerError)
+		return
+	}
+	if isAuth {
+		params := mux.Vars(r)
+
+		var products []entity.Product
+		result := db.Where("farmer_email = ?", params["id"]).Find(&products)
+		if result.RecordNotFound() {
+			http.Error(w, "Not fount", http.StatusNotFound)
+			return
+		}
+
+		json.NewEncoder(w).Encode(products)
+	}
+}
+
+/////////////////////////////////////////GET PRODUCT BY EMAIL OF FARMER 
+func GetFarmerOrders(w http.ResponseWriter, r *http.Request){
+	//Check the credentials provided in the request. Also check for errors at authentication.
+	isAuth, err := IsAuth(w, r)
+	if HasError(err, "Error in authentication function") {
+		http.Error(w, "Internal Error. Please try again later", http.StatusInternalServerError)
+		return
+	}
+	if isAuth {
+		params := mux.Vars(r)
+
+		var products []entity.Product
+		result := db.Where("farmer_email = ?", params["id"]).Find(&products)
+		if result.RecordNotFound() {
+			http.Error(w, "Not fount", http.StatusNotFound)
+			return
+		}
+
+		
+		var id_products []string
+          
+		 for _, s := range products {
+         id_products= append(id_products, s.ID)
+      }
+
+	  var full_orders []entity.Users_Products
+		
+      for _, a := range id_products {
+			var orders []entity.Users_Products
+			result := db.Where("product_id = ?", a).Find(&orders)
+			if result.RecordNotFound() {
+				http.Error(w, "Not fount", http.StatusNotFound)
+				return
+			}
+
+			full_orders = append(full_orders, orders...)
+		}
+
+
+
+
+		json.NewEncoder(w).Encode(full_orders)
+	}
+}
+
+
 
 //Delete a specific product by ID
 func DeleteOrderProduct(w http.ResponseWriter, r *http.Request) {
@@ -797,10 +932,10 @@ func IncrementOrderProduct(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "Can't update", http.StatusInternalServerError)
 			return
 		}
-		var new_quantity=order_product.Quantity+1
-		
-		result2 :=db.Model(&order_product).Select("quantity").Updates(map[string]interface{}{"quantity": new_quantity})
-			if result2.Error != nil {
+		var new_quantity = order_product.Quantity + 1
+
+		result2 := db.Model(&order_product).Select("quantity").Updates(map[string]interface{}{"quantity": new_quantity})
+		if result2.Error != nil {
 			http.Error(w, "Can't update", http.StatusInternalServerError)
 			return
 		}
@@ -808,7 +943,7 @@ func IncrementOrderProduct(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func DecrementOrderProduct(w http.ResponseWriter, r *http.Request) {
+func DecrementOrderProduct(w http.ResponseWriter, r *http.Request) {//merge trebuie implementat in front
 	isAuth, err := IsAuth(w, r)
 	if HasError(err, "Error in authentication function") {
 		http.Error(w, "Internal Error. Please try again later", http.StatusInternalServerError)
@@ -824,15 +959,46 @@ func DecrementOrderProduct(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "Can't update", http.StatusInternalServerError)
 			return
 		}
-		var new_quantity=order_product.Quantity-1
-		
-		result2 :=db.Model(&order_product).Select("quantity").Updates(map[string]interface{}{"quantity": new_quantity})
-			if result2.Error != nil {
+		var new_quantity = order_product.Quantity - 1
+
+		result2 := db.Model(&order_product).Select("quantity").Updates(map[string]interface{}{"quantity": new_quantity})
+		if result2.Error != nil {
 			http.Error(w, "Can't update", http.StatusInternalServerError)
 			return
 		}
 		json.NewEncoder(w).Encode(order_product.Quantity)
 	}
+}
+
+func OrderCheckout(w http.ResponseWriter, r *http.Request) {///merge trebuie implementat in front-end
+
+	//Check the credentials provided in the request. Also check for errors at authentication.
+	isAuth, err := IsAuth(w, r)
+	if HasError(err, "Error in authentication function") {
+		http.Error(w, "Internal Error. Please try again later", http.StatusInternalServerError)
+		return
+	}
+	if isAuth {
+		params := mux.Vars(r)
+
+		var orders []entity.Users_Products
+		result := db.Where("user_email = ?", params["id"]).Find(&orders)
+		if result.RecordNotFound() {
+			http.Error(w, "Not fount", http.StatusNotFound)
+			return
+		}
+         var new_status = "canceled"
+
+		result = db.Model(&orders).Select("status").Updates(map[string]interface{}{"status": new_status})
+
+		if result.RecordNotFound() {
+			http.Error(w, "Not fount", http.StatusNotFound)
+			return
+		}
+
+		json.NewEncoder(w).Encode(orders)
+	}
+
 }
 
 ////Get all cart items from a user
@@ -854,7 +1020,7 @@ func GetCart(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		result2 := db.Where("user_email = ?", params["id"]).Find(&orders)
+		result2 := db.Where("user_email = ? AND status = ?", params["id"] ,"active").Find(&orders)
 		if result2.RecordNotFound() {
 			http.Error(w, "Not fount", http.StatusNotFound)
 			return
