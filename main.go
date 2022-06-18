@@ -79,6 +79,9 @@ func main() {
 	router.HandleFunc("/product/{id}", UpdateProduct).Methods("PUT")                    //merge
 	router.HandleFunc("/product_by_category/{id}", GetProductByCategory).Methods("GET") //merge
 	router.HandleFunc("/search_name/{id}", GetSearchProducts).Methods("GET")
+	router.HandleFunc("/search_name_/{email}/{name}", GetSearchProductsFarmers).Methods("GET")
+
+	router.HandleFunc("/product_by_category_farmer/{email}/{category}", GetProductByCategoryFarmer).Methods("GET") //merge
 
 	router.HandleFunc("/users_products", GetOrdersProducts).Methods("GET")               //merge
 	router.HandleFunc("/orders/{id}", GetOrderProduct).Methods("GET")                    //merge
@@ -700,6 +703,40 @@ func UpdateProduct(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+//#Get products by category own by farmer
+func GetProductByCategoryFarmer( w http.ResponseWriter, r *http.Request){
+	isAuth, err := IsAuth(w, r)
+	if HasError(err, "Error in authentication function") {
+		http.Error(w, "Internal Error. Please try again later", http.StatusInternalServerError)
+		return
+	}
+	if isAuth {
+			params := mux.Vars(r)
+
+        email := params["email"]
+		category := params["category"]
+		var products []entity.Product
+		result := db.Where("farmer_email = ?", email).Find(&products)
+		if result.RecordNotFound() {
+			http.Error(w, "Not fount", http.StatusNotFound)
+			return
+		}
+		var category_products []entity.Product
+		for _, product := range products {
+			if product.Category == category {
+				category_products = append(category_products, product)
+			}
+
+		}
+		if len(category_products) == 0 {
+			http.Error(w, "Wrong category", http.StatusInternalServerError)
+			return
+		}
+		json.NewEncoder(w).Encode(&category_products)
+	}
+}
+
+
 func GetProductByCategory(w http.ResponseWriter, r *http.Request) {
 	//Check the credentials provided in the request. Also check for errors at authentication.
 
@@ -728,6 +765,28 @@ func GetProductByCategory(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		json.NewEncoder(w).Encode(&category_products)
+	}
+}
+
+//Get search produc own by farmer
+func GetSearchProductsFarmers(w http.ResponseWriter, r *http.Request){
+		isAuth, err := IsAuth(w, r)
+	if HasError(err, "Error in authentication function") {
+		http.Error(w, "Internal Error. Please try again later", http.StatusInternalServerError)
+		return
+	}
+	if isAuth {
+		params := mux.Vars(r)
+		email := params["email"]
+		name := params["name"]
+		var products []entity.Product
+		result := db.Where("product_name LIKE ? AND farmer_email= ?","%"+name+"%",email).Find(&products)
+		if result.RecordNotFound() {
+			http.Error(w, "Not fount", http.StatusNotFound)
+			return
+		}
+
+		json.NewEncoder(w).Encode(&products)
 	}
 }
 
