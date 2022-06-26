@@ -79,7 +79,7 @@ func main() {
 	router.HandleFunc("/product/{id}", UpdateProduct).Methods("PUT")                    //merge
 	router.HandleFunc("/product_by_category/{id}", GetProductByCategory).Methods("GET") //merge
 	router.HandleFunc("/search_name/{id}", GetSearchProducts).Methods("GET")
-	router.HandleFunc("/search_name_/{email}/{name}", GetSearchProductsFarmers).Methods("GET")
+	router.HandleFunc("/search_name_farmers_products/{email}/{name}", GetSearchProductsFarmers).Methods("GET")
 
 	router.HandleFunc("/product_by_category_farmer/{email}/{category}", GetProductByCategoryFarmer).Methods("GET") //merge
 
@@ -501,7 +501,7 @@ func GetFarmer(w http.ResponseWriter, r *http.Request) {
 
 		var farmer entity.Farmer
 		var products []entity.Product
-		result := db.Where("id = ?", params["id"]).First(&farmer)
+		result := db.Where("email = ?", params["id"]).First(&farmer)
 		if result.RecordNotFound() {
 			http.Error(w, "Not fount", http.StatusNotFound)
 			return
