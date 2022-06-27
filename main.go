@@ -10,11 +10,13 @@ import (
 	"time"
 
 	"github.com/andreibugariu/BioShop-License/entity"
+	"github.com/andreibugariu/BioShop-License/util"
 	"github.com/dgrijalva/jwt-go"
 	"github.com/gorilla/mux"
 	"github.com/jinzhu/gorm"
 	_ "github.com/jinzhu/gorm/dialects/postgres"
 	"github.com/sirupsen/logrus"
+	"golang.org/x/crypto/bcrypt"
 )
 
 var db *gorm.DB
@@ -28,7 +30,7 @@ const NAME = "postgres"
 const PASSWORD = "metalgreu98" ///here introduce your password !!!!
 
 func main() {
-
+    testEncodeO()
 	dbURI := fmt.Sprintf("host=%s user=%s dbname=%s sslmode=disable password=%s port=%s", HOST, USER, NAME, PASSWORD, DBPORT)
 
 	db, err = gorm.Open(DIALECT, dbURI)
@@ -44,21 +46,12 @@ func main() {
 	db.AutoMigrate(&entity.Farmer{})
 	db.AutoMigrate(&entity.Users_Products{})
 	db.AutoMigrate(&entity.Product{})
-	// db.AutoMigrate(&entity.Order{})
-
-	/*createUser := db.Create(user)
-	err = createUser.Error
-	if err != nil {
-		fmt.Println("are eroare")
-	} else {
-		fmt.Println("nu are  eroare")
-	}*/
 
 	router := mux.NewRouter()
 
 	router.HandleFunc("/users", GetUsers).Methods("GET")          //merge
 	router.HandleFunc("/user/{id}", GetUser).Methods("GET")       //merge
-	router.HandleFunc("/user", CreateUser).Methods("POST")        //merge
+	router.HandleFunc("/user",CreateUser).Methods("POST")        //merge
 	router.HandleFunc("/user/{id}", DeleteUser).Methods("DELETE") //merge
 	router.HandleFunc("/user/{id}", UpdateUser).Methods("PUT")    //merge
 
@@ -101,6 +94,7 @@ func main() {
 	router.HandleFunc("/get_user", GetEmailCookie)
 
 	log.Fatal(http.ListenAndServe(":8080", router))
+
 }
 
 ///Login
@@ -143,7 +137,7 @@ func Login(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Internal Error. Please try again later", http.StatusInternalServerError)
 		return
 	}
-
+    
 	var userDB entity.User
 	result := db.Find(&userDB, "email=?", user.Email)
 
@@ -152,7 +146,10 @@ func Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if user.Password != userDB.Password {
+	err = util.CheckPassword(user.Password,userDB.Password)
+
+
+	if err != nil {
 		http.Error(w, "Incorrect password", http.StatusUnauthorized)
 		return
 	}
@@ -208,7 +205,9 @@ func LoginFarmer(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if farmer.Password != userDB.Password {
+		err = util.CheckPassword(farmer.Password,userDB.Password)
+
+	if err != nil {
 		http.Error(w, "Incorrect password", http.StatusUnauthorized)
 		return
 	}
@@ -338,13 +337,23 @@ func CreateUser(w http.ResponseWriter, r *http.Request) {
 	var user entity.User
 
 	json.NewDecoder(r.Body).Decode(&user)
+    
+	var password string
+	password, erro := util.HashPassword(user.Password)
+
+	if erro != nil {
+		json.NewEncoder(w).Encode(erro)
+	}
+
+	user.Password=password
+
 	user.Category = "USER"
 	createUser := db.Create(&user)
 	err = createUser.Error
 	if err != nil {
 		json.NewEncoder(w).Encode(err)
 	} else {
-		json.NewEncoder(w).Encode(&user)
+		json.NewEncoder(w).Encode(&user.Password)
 	}
 }
 
@@ -1107,3 +1116,33 @@ func GetCart(w http.ResponseWriter, r *http.Request) {
 		json.NewEncoder(w).Encode(full_products)
 	}
 }
+func testEncodeO(){
+	var parol string
+    parol, err :=util.HashPassword("parolaa")
+
+	if err != nil {
+		fmt.Print("eror")
+	}
+
+	err = bcrypt.CompareHashAndPassword([]byte(parol),[]byte("ddparolaa"))
+
+	if err != nil {
+		fmt.Println("eror")
+	}else {
+		fmt.Print("merge")
+	}
+
+	
+    err = util.CheckPassword("parolaa",parol)
+    
+	if err != nil {
+		fmt.Println("eror")
+	}else {
+		fmt.Println("merge")
+	}
+
+
+
+
+
+} 
