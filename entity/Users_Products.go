@@ -6,6 +6,6 @@ type Users_Products struct {
 	ProductID string  `gorm:"type:uuid;column:product_id;not null" validate:"required"`
 	ProductName string  `gorm:"type:varchar(255);not null"`
 	ProductPrice  float64 `gorm:"type:float;not null"`
-	Quantity  float64 `gorm:"type:float;not null"`
+	Quantity  float64 `gorm:"type:int;not null"`
     Status string  `gorm:"type:varchar(255);not null"`
 }

@@ -27,7 +27,7 @@ const HOST = "localhost"
 const DBPORT = "5432"
 const USER = "postgres"
 const NAME = "postgres"
-const PASSWORD = "metalgreu98" ///here introduce your password !!!!
+const PASSWORD = "metalgreu98" 
 
 func main() {
     testEncodeO()
@@ -49,48 +49,48 @@ func main() {
 
 	router := mux.NewRouter()
 
-	router.HandleFunc("/users", GetUsers).Methods("GET")          //merge
-	router.HandleFunc("/user/{id}", GetUser).Methods("GET")       //merge
-	router.HandleFunc("/user",CreateUser).Methods("POST")        //merge
-	router.HandleFunc("/user/{id}", DeleteUser).Methods("DELETE") //merge
-	router.HandleFunc("/user/{id}", UpdateUser).Methods("PUT")    //merge
+	router.HandleFunc("/users", GetUsers).Methods("GET")          
+	router.HandleFunc("/user/{id}", GetUser).Methods("GET")       
+	router.HandleFunc("/user",CreateUser).Methods("POST")        
+	router.HandleFunc("/user/{id}", DeleteUser).Methods("DELETE") 
+	router.HandleFunc("/user/{id}", UpdateUser).Methods("PUT")    
 
-	router.HandleFunc("/farmers", GetFarmers).Methods("GET")          //merge
-	router.HandleFunc("/farmer/{id}", GetFarmer).Methods("GET")       //merge
-	router.HandleFunc("/farmer", CreateFarmer).Methods("POST")        //merge
-	router.HandleFunc("/farmer/{id}", DeleteFarmer).Methods("DELETE") //merge
-	router.HandleFunc("/farmer/{id}", UpdateFarmer).Methods("PUT")    //merge
+	router.HandleFunc("/farmers", GetFarmers).Methods("GET")          
+	router.HandleFunc("/farmer/{id}", GetFarmer).Methods("GET")       
+	router.HandleFunc("/farmer", CreateFarmer).Methods("POST")        
+	router.HandleFunc("/farmer/{id}", DeleteFarmer).Methods("DELETE") 
+	router.HandleFunc("/farmer/{id}", UpdateFarmer).Methods("PUT")    
 
 	router.HandleFunc("/farmer_products/{id}",GetFarmerProducts).Methods("GET") 
 
 	router.HandleFunc("/farmer_orders/{id}",GetFarmerOrders).Methods("GET") 
 
-	router.HandleFunc("/products", GetProducts).Methods("GET")                          //merge
-	router.HandleFunc("/product/{id}", GetProduct).Methods("GET")                       //merge
-	router.HandleFunc("/product", CreateProduct).Methods("POST")                        //merge
-	router.HandleFunc("/product/{id}", DeleteProduct).Methods("DELETE")                 //merge
-	router.HandleFunc("/product/{id}", UpdateProduct).Methods("PUT")                    //merge
-	router.HandleFunc("/product_by_category/{id}", GetProductByCategory).Methods("GET") //merge
+	router.HandleFunc("/products", GetProducts).Methods("GET")                          
+	router.HandleFunc("/product/{id}", GetProduct).Methods("GET")                       
+	router.HandleFunc("/product", CreateProduct).Methods("POST")                        
+	router.HandleFunc("/product/{id}", DeleteProduct).Methods("DELETE")                 
+	router.HandleFunc("/product/{id}", UpdateProduct).Methods("PUT")                    
+	router.HandleFunc("/product_by_category/{id}", GetProductByCategory).Methods("GET") 
 	router.HandleFunc("/search_name/{id}", GetSearchProducts).Methods("GET")
 	router.HandleFunc("/search_name_farmers_products/{email}/{name}", GetSearchProductsFarmers).Methods("GET")
 
-	router.HandleFunc("/product_by_category_farmer/{email}/{category}", GetProductByCategoryFarmer).Methods("GET") //merge
+	router.HandleFunc("/product_by_category_farmer/{email}/{category}", GetProductByCategoryFarmer).Methods("GET") 
 
-	router.HandleFunc("/users_products", GetOrdersProducts).Methods("GET")               //merge
-	router.HandleFunc("/orders/{id}", GetOrderProduct).Methods("GET")                    //merge
-	router.HandleFunc("/user_product/{id}", GetCart).Methods("GET")                      //merge
-	router.HandleFunc("/user_product", CreateOrderProduct).Methods("POST")               //merge
-	router.HandleFunc("/delete_user_product/{id}", DeleteOrderProduct).Methods("DELETE") //merge
-	router.HandleFunc("/increment/{id}", IncrementOrderProduct).Methods("PUT")           //merge
+	router.HandleFunc("/users_products", GetOrdersProducts).Methods("GET")               
+	router.HandleFunc("/orders/{id}", GetOrderProduct).Methods("GET")                    
+	router.HandleFunc("/user_product/{id}", GetCart).Methods("GET")                      
+	router.HandleFunc("/user_product", CreateOrderProduct).Methods("POST")               
+	router.HandleFunc("/delete_user_product/{id}", DeleteOrderProduct).Methods("DELETE") 
+	router.HandleFunc("/increment/{id}", IncrementOrderProduct).Methods("PUT")           
 	router.HandleFunc("/decrement/{id}", DecrementOrderProduct).Methods("PUT")
 	router.HandleFunc("/checkout/{id}", OrderCheckout).Methods("PUT")
 
-	////////////////////////////////////////////////
+	
 	
 
-	router.HandleFunc("/login", Login)         //merge
-	router.HandleFunc("/login_farmer", LoginFarmer)         //merge
-	router.HandleFunc("/logout", DeleteCookie) //merge
+	router.HandleFunc("/login", Login)         
+	router.HandleFunc("/login_farmer", LoginFarmer)         
+	router.HandleFunc("/logout", DeleteCookie) 
 	router.HandleFunc("/get_user", GetEmailCookie)
 
 	log.Fatal(http.ListenAndServe(":8080", router))
@@ -466,7 +466,13 @@ func CreateFarmer(w http.ResponseWriter, r *http.Request) {
 	farmer.Category = "FARMER"
 
 	json.NewDecoder(r.Body).Decode(&farmer)
+	var password string
+	password, erro := util.HashPassword(farmer.Password)
 
+	if erro != nil {
+		json.NewEncoder(w).Encode(erro)
+	}
+    farmer.Password=password
 	createFarmer := db.Create(&farmer)
 	err = createFarmer.Error
 	if err != nil {
@@ -833,6 +839,35 @@ func CreateOrderProduct(w http.ResponseWriter, r *http.Request) {
 
 		json.NewDecoder(r.Body).Decode(&user_product)
 		user_product.Status = "active"
+		
+
+		var product entity.Product
+
+		result := db.Where("id = ?", user_product.ProductID).First(&product)
+
+		
+        if result.RecordNotFound() {
+			http.Error(w, "Not fount", http.StatusNotFound)
+			return
+		}
+
+		 fproduct := float64(product.Quantity)
+         
+		if fproduct <= user_product.Quantity{
+             	json.NewEncoder(w).Encode("exceeded capacity")
+				return
+		}
+
+        new_quantity:=fproduct-user_product.Quantity
+
+		result2 := db.Model(&product).Select("quantity").Updates(map[string]interface{}{"quantity": new_quantity})
+		if result2.Error != nil {
+			http.Error(w, "Can't update", http.StatusInternalServerError)
+			return
+		}
+
+
+
 		createUserProduct := db.Create(&user_product)
 		err = createUserProduct.Error
 		if err != nil {
