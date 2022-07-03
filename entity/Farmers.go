@@ -8,8 +8,8 @@ type Farmer struct {
 	Address     string    `gorm:"type:varchar(255);not null"`
 	Email       string    `gorm:"type:varchar(255);not null;unique" validate:"required,email"`
 	Password    string    `gorm:"type:varchar(255);not null" validate:"required,min=6"`
-	PhoneNumber string      `gorm:"type:varchar(255);not null"`
+	PhoneNumber string    `gorm:"type:varchar(255);not null"`
 	BankDetails string    `gorm:"type:varchar(255);not null"`
-	Category string    `gorm:"type:varchar(255);not null"`
-	Products   []Product  `gorm:"foreignKey:ProductID"`
+	Category    string    `gorm:"type:varchar(255);not null"`
+	Products    []Product `gorm:"foreignKey:ProductID"`
 }
